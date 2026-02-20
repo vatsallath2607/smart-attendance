@@ -1,0 +1,152 @@
+/*
+ * Custom styles for the SMART-ATTENDANCE application.
+ * Aiming for a professional, top-tier project aesthetic.
+ */
+
+/* --- Custom Variables & Theme --- */
+
+:root {
+    /* New Vibrant Palette (Teal/Cyan Focus) */
+    --primary-color: #00bcd4; /* Cyan/Teal */
+    --primary-dark: #0097a7; 
+    --secondary-color: #6c757d;
+    --success-color: #4caf50; /* Green */
+    --danger-color: #f44336; /* Red */
+    
+    --background-light: #eceff1; /* Very light gray background */
+    --card-bg: #ffffff;
+    
+    --font-family-sans-serif: 'Poppins', sans-serif; 
+}
+
+/* --- General & Typography --- */
+
+body {
+    font-family: var(--font-family-sans-serif);
+    background-color: var(--background-light);
+    color: #212121; 
+    padding-bottom: 50px; 
+}
+
+h1, h5 {
+    font-weight: 600;
+}
+
+/* --- Card & Shadow Consistency --- */
+
+.card {
+    border: none;
+    border-radius: 12px; 
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1); /* Deeper, softer shadow */
+    background-color: var(--card-bg);
+    transition: box-shadow 0.3s ease;
+}
+
+/* --- Header Branding (Faculty Page) --- */
+
+.header-section {
+    background-color: var(--primary-dark); /* Dark primary color for a premium header */
+    color: white;
+    padding: 25px 40px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    margin-bottom: 25px;
+}
+
+.header-section h1 {
+    color: white !important;
+}
+
+/* --- Faculty Dashboard Specifics --- */
+
+/* Controls Card */
+.controls-card {
+    border: 1px solid #e0e0e0;
+}
+
+/* Session Code Highlight */
+.code-box {
+    font-size: 1.8rem !important;
+    font-weight: 700 !important;
+    color: var(--primary-dark);
+    border: 3px solid var(--primary-dark) !important;
+    background: #e0f7fa !important; /* Very light cyan */
+    padding: 10px 20px !important;
+    display: inline-block;
+    border-radius: 8px;
+    letter-spacing: 1px;
+}
+
+/* Buttons (Using primary color) */
+.btn-primary {
+    background-color: var(--primary-color) !important;
+    border-color: var(--primary-color) !important;
+}
+
+.btn-success {
+    background-color: var(--primary-color) !important;
+    border-color: var(--primary-color) !important;
+    font-weight: 600;
+}
+.btn-success:hover {
+    background-color: var(--primary-dark) !important;
+    border-color: var(--primary-dark) !important;
+}
+
+/* Attendance Table Overrides */
+.table th {
+    background-color: var(--primary-color);
+    color: white;
+    font-weight: 600;
+    border-color: var(--primary-dark);
+}
+
+.table-striped > tbody > tr:nth-of-type(odd) > * {
+    background-color: #f7f9fb;
+}
+
+/* Student Photo (Circular and Hover Effect) */
+img.thumb {
+    width: 65px; 
+    height: 65px;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 3px solid #b2dfdb; /* Light cyan border */
+    transition: border-color 0.3s, transform 0.3s ease;
+}
+
+img.thumb:hover {
+    border-color: var(--primary-color);
+    transform: scale(1.05);
+}
+
+/* Responsive Table Scroll */
+.table-responsive {
+    border-radius: 8px;
+    overflow-x: auto;
+}
+
+/* --- Student Page Specifics --- */
+
+/* Camera & Canvas styling */
+#student #video, 
+#student #canvas {
+    border: 4px solid var(--primary-color); /* Thicker border for focus */
+    border-radius: 10px;
+    box-shadow: 0 0 15px rgba(0, 188, 212, 0.7); /* Stronger glow effect */
+    display: block;
+    margin: 15px auto;
+    max-width: 100%;
+    height: auto;
+}
+
+/* Alert Styling for Status */
+.alert-success {
+    background-color: #e8f5e9; /* Lighter success background */
+    border-color: #a5d6a7;
+    color: var(--success-color);
+}
+.alert-danger {
+    color: var(--danger-color);
+    background-color: #ffebee;
+    border-color: #ffcdd2;
+}

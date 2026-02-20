@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Faculty — Attendance Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container-fluid p-0">
+        <div class="header-section">
+            <div class="container">
+                <h1><i class="fas fa-clipboard-check me-3"></i>Attendance Dashboard</h1>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="controls-card card p-4 mb-4">
+                <div class="d-flex flex-wrap align-items-center gap-3 mb-4">
+                    <div class="col-auto">
+                        <label for="section_select" class="form-label mb-0 fw-bold">Section:</label>
+                        <select id="section_select" class="form-select form-select-sm"><option>Loading...</option></select>
+                    </div>
+
+                    <div class="col-auto">
+                        <label for="duration" class="form-label mb-0 fw-bold">Duration (mins):</label>
+                        <input id="duration" type="number" value="5" class="form-control form-control-sm" style="width: 80px;">
+                    </div>
+
+                    <button id="start_att" class="btn btn-success btn-sm"><i class="fas fa-play me-1"></i>Start Attendance</button>
+                    <button id="stop_att" class="btn btn-danger btn-sm" disabled><i class="fas fa-stop me-1"></i>Stop Attendance</button>
+                    <button id="refresh" class="btn btn-outline-secondary btn-sm"><i class="fas fa-sync-alt me-1"></i>Refresh</button>
+                    <button id="export" class="btn btn-info btn-sm text-white"><i class="fas fa-download me-1"></i>Export CSV</button>
+
+                    <div id="status" class="ms-auto" style="min-width: 150px;"></div>
+                </div>
+
+                <div id="session_area" class="d-flex align-items-center flex-wrap gap-4 pt-3 border-top">
+                    <div id="code_display">
+                        <label class="form-label mb-1 fw-bold">Current Code:</label>
+                        <div id="code_box" class="code-box">---</div>
+                    </div>
+                    <div id="session_info">
+                        <div class="session-info"><b>Expires at (UTC):</b> <span id="expires_at_display">--</span></div>
+                        <div class="session-info">Section ID: <span id="section_id_display">--</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card p-4">
+                <h5 class="card-title text-secondary mb-3"><i class="fas fa-list-ul me-2"></i>Attendance Records (Last 24 Hours)</h5>
+                <div id="table_wrap" class="table-responsive">
+                    <p>Select a section and start a session to view attendance.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    (async function() {
+        const sectionSelect = document.getElementById('section_select');
+        const status = document.getElementById('status');
+        const tableWrap = document.getElementById('table_wrap');
+        const startBtn = document.getElementById('start_att');
+        const stopBtn = document.getElementById('stop_att');
+        const refreshBtn = document.getElementById('refresh');
+        const exportBtn = document.getElementById('export');
+        const durationInput = document.getElementById('duration');
+        const codeBox = document.getElementById('code_box');
+        const expiresAtDisplay = document.getElementById('expires_at_display');
+        const sectionIdDisplay = document.getElementById('section_id_display');
+        
+        let currentSession = null; 
+    
+        async function loadSections(){
+            sectionSelect.innerHTML = '<option>Loading...</option>';
+            try {
+                const res = await fetch('/api/sections');
+                const j = await res.json();
+                sectionSelect.innerHTML = '';
+                if (j.success) {
+                    if (j.sections.length === 0) {
+                        sectionSelect.innerHTML = '<option value="">(no sections)</option>';
+                        return;
+                    }
+                    j.sections.forEach(s => {
+                        const opt = document.createElement('option');
+                        opt.value = s.id;
+                        opt.text = s.name;
+                        sectionSelect.appendChild(opt);
+                    });
+                } else {
+                    status.innerHTML = `<span class="error"><i class="fas fa-exclamation-triangle me-1"></i> Error loading sections</span>`;
+                }
+            } catch (e) {
+                status.innerHTML = `<span class="error"><i class="fas fa-exclamation-triangle me-1"></i> Error loading sections</span>`;
+                console.error(e);
+            }
+        }
+    
+        async function startAttendance() {
+            const section = sectionSelect.value;
+            if (!section) return alert('Select a section first');
+            let duration = parseInt(durationInput.value) || 5;
+            startBtn.disabled = true;
+            status.innerHTML = '<span class="text-secondary"><i class="fas fa-circle-notch fa-spin me-1"></i>Starting...</span>';
+            try {
+                const res = await fetch('/api/generate_session', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({section_id: section, duration_min: duration})
+                });
+                const j = await res.json();
+                if (!j.success) {
+                    status.innerHTML = `<span class="error"><i class="fas fa-times-circle me-1"></i>Error: ${j.msg || j.details || 'unknown'}</span>`;
+                    startBtn.disabled = false;
+                    return;
+                }
+                currentSession = {
+                    session_id: j.session_id,
+                    code: j.code,
+                    expires_at: j.expires_at,
+                    section_id: section
+                };
+                showSession(currentSession);
+                stopBtn.disabled = false;
+                status.innerHTML = `<span class="success"><i class="fas fa-check-circle me-1"></i>Session started</span>`;
+                await loadAttendance();
+                startBtn.disabled = false;
+            } catch (e) {
+                console.error(e);
+                status.innerHTML = `<span class="error"><i class="fas fa-times-circle me-1"></i>Failed to start session</span>`;
+                startBtn.disabled = false;
+            }
+        }
+    
+        async function stopAttendance() {
+            if (!currentSession && !sectionSelect.value) return alert('No active session selected');
+            stopBtn.disabled = true;
+            status.innerHTML = '<span class="text-secondary"><i class="fas fa-circle-notch fa-spin me-1"></i>Stopping...</span>';
+            try {
+                const payload = currentSession && currentSession.session_id ? {session_id: currentSession.session_id} : {section_id: sectionSelect.value};
+                const res = await fetch('/api/stop_session', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                const j = await res.json();
+                if (!j.success) {
+                    status.innerHTML = `<span class="error"><i class="fas fa-times-circle me-1"></i>Error: ${j.msg || j.details || 'none stopped'}</span>`;
+                    stopBtn.disabled = false;
+                    return;
+                }
+                status.innerHTML = `<span class="success"><i class="fas fa-check-circle me-1"></i>Stopped ${j.stopped} session(s)</span>`;
+                currentSession = null;
+                showSession(null);
+                await loadAttendance();
+                stopBtn.disabled = false;
+            } catch (e) {
+                console.error(e);
+                status.innerHTML = `<span class="error"><i class="fas fa-times-circle me-1"></i>Failed to stop session</span>`;
+                stopBtn.disabled = false;
+            }
+        }
+    
+        function formatTimestamp(isoDate) {
+            try {
+                const date = new Date(isoDate + 'Z'); 
+                return date.toLocaleTimeString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short' });
+            } catch {
+                return isoDate;
+            }
+        }
+    
+        function showSession(s) {
+            if (!s) {
+                codeBox.innerHTML = '---';
+                expiresAtDisplay.innerText = '--';
+                sectionIdDisplay.innerText = '--';
+                stopBtn.disabled = true;
+                return;
+            }
+            codeBox.innerHTML = s.code;
+            expiresAtDisplay.innerText = formatTimestamp(s.expires_at);
+            sectionIdDisplay.innerText = s.section_id;
+            stopBtn.disabled = false;
+        }
+    
+        async function loadAttendance() {
+            const sid = sectionSelect.value;
+            if (!sid) { tableWrap.innerHTML = '<p class="alert alert-warning">Select a section to view attendance.</p>'; return; }
+            status.innerHTML = '<span class="text-secondary"><i class="fas fa-circle-notch fa-spin me-1"></i>Loading...</span>';
+            try {
+                const res = await fetch(`/api/attendance/${sid}`);
+                const j = await res.json();
+                if (!j.success) {
+                    tableWrap.innerHTML = `<p class="alert alert-danger">Error: ${j.msg || 'failed'}</p>`;
+                    status.innerText = '';
+                    return;
+                }
+                const rows = j.items;
+                if (rows.length === 0) {
+                    tableWrap.innerHTML = '<p class="alert alert-info mb-0">No attendance recorded in the last 24 hours.</p>';
+                    status.innerHTML = `<span class="success">Loaded 0 records</span>`;
+                    return;
+                }
+                
+                let html = '<table class="table table-striped table-hover align-middle"><thead><tr><th scope="col">Reg No</th><th scope="col">Photo</th><th scope="col">Timestamp</th></tr></thead><tbody>';
+                rows.forEach(r => {
+                    const photoUrl = r.photo_path.startsWith('/') ? r.photo_path : '/' + r.photo_path;
+                    html += `<tr>
+                                <td>${r.reg_no}</td>
+                                <td><a href="${photoUrl}" target="_blank"><img class="thumb" src="${photoUrl}" alt="Student Photo"></a></td>
+                                <td>${formatTimestamp(r.timestamp)}</td>
+                            </tr>`;
+                });
+                html += '</tbody></table>';
+                tableWrap.innerHTML = html;
+                status.innerHTML = `<span class="success">Loaded ${rows.length} records</span>`;
+            } catch (e) {
+                console.error(e);
+                tableWrap.innerHTML = `<p class="alert alert-danger">Failed to load attendance: ${e}</p>`;
+                status.innerText = '';
+            }
+        }
+    
+        function exportCSV() {
+            const sid = sectionSelect.value;
+            if (!sid) return alert('Select a section first');
+            const rows = Array.from(document.querySelectorAll('#table_wrap table tbody tr'));
+            if (rows.length === 0) return alert('No rows to export');
+            let csv = 'reg_no,photo_url,timestamp\n';
+            rows.forEach(tr => {
+                const cols = tr.querySelectorAll('td');
+                const reg = cols[0].innerText.trim();
+                const photo = cols[1].querySelector('a').href;
+                const ts = cols[2].innerText.trim();
+                csv += `"${reg.replace(/"/g, '""')}","${photo.replace(/"/g, '""')}","${ts.replace(/"/g, '""')}"\n`;
+            });
+            const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = `attendance_section_${sid}_${new Date().toISOString().slice(0, 10)}.csv`;
+            document.body.appendChild(a); a.click(); a.remove();
+            URL.revokeObjectURL(url);
+        }
+    
+        // events
+        startBtn.onclick = startAttendance;
+        stopBtn.onclick = stopAttendance;
+        refreshBtn.onclick = loadAttendance;
+        exportBtn.onclick = exportCSV;
+        sectionSelect.onchange = loadAttendance;
+    
+        // initial load
+        await loadSections();
+        if (sectionSelect.value) loadAttendance();
+    
+    })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+Flask>=2.0
+face_recognition
+opencv-python
+numpy
+qrcode
+Pillow
+pandas

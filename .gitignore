@@ -1,0 +1,8 @@
+# .gitignore
+venv/
+__pycache__/
+*.pyc
+data/*.db
+data/*.pkl
+data/photos/
+.env

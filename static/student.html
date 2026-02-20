@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Student Attendance</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body id="student">
+    <div class="container my-5">
+        <div class="row justify-content-center">
+            <div class="col-md-6 col-lg-5">
+                <div class="card p-4">
+                    <h1 class="card-title text-center" style="color: var(--primary-dark);"><i class="fas fa-user-check me-2"></i>Student Attendance</h1>
+
+                    <div class="mb-3">
+                        <label for="reg_no" class="form-label fw-bold">Registration No:</label>
+                        <input id="reg_no" class="form-control" placeholder="Enter registration number">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="code" class="form-label fw-bold">Session Code:</label>
+                        <input id="code" class="form-control" placeholder="Paste or scan code">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="section_select" class="form-label fw-bold">Section:</label>
+                        <select id="section_select" class="form-select">
+                            <option value="">Loading sections…</option>
+                        </select>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-block my-3 text-center">
+                        <button id="startCam" class="btn btn-primary"><i class="fas fa-video me-2"></i>Start Camera</button>
+                        <button id="snap" class="btn btn-warning" disabled><i class="fas fa-camera me-2"></i>Capture</button>
+                    </div>
+
+                    <div class="text-center">
+                        <video id="video" autoplay playsinline></video>
+                        <canvas id="canvas" width="320" height="240" style="display:none;"></canvas>
+                    </div>
+
+                    <div id="msg" class="msg alert alert-info mt-3 text-center fw-bold" role="alert">
+                        Ready to start camera.
+                    </div>
+
+                    <button id="submit" class="btn btn-success btn-lg mt-3" disabled>
+                        <i class="fas fa-check-circle me-2"></i>Submit Attendance
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+    (async function(){
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const sectionSelect = document.getElementById('section_select');
+        const codeInput = document.getElementById('code');
+        const regInput = document.getElementById('reg_no');
+        const msg = document.getElementById('msg');
+    
+        // Helper: read ?code=...&section=... from URL and auto-fill
+        function readUrlParams() {
+            const params = new URLSearchParams(window.location.search);
+            const code = params.get('code');
+            const section = params.get('section'); // note: this is numeric (our QR contains numeric section id)
+            return { code, section };
+        }
+        
+        function updateMsgAlert(text, type) {
+            // Remove all existing alert classes before adding the new one
+            msg.className = msg.className.replace(/\balert-(info|success|warning|danger|primary)\b/g, '');
+            msg.className = `msg alert alert-${type} mt-3 text-center fw-bold`;
+            msg.innerHTML = text;
+        }
+
+        // Fetch sections from backend and populate dropdown
+        async function loadSections() {
+            try {
+                const res = await fetch('/api/sections');
+                const j = await res.json();
+                if (j.success) {
+                    sectionSelect.innerHTML = ''; // clear
+                    if (j.sections.length === 0) {
+                        const o = document.createElement('option');
+                        o.value = '';
+                        o.text = 'No sections available';
+                        sectionSelect.appendChild(o);
+                        return;
+                    }
+                    for (const s of j.sections) {
+                        const opt = document.createElement('option');
+                        opt.value = s.id;
+                        opt.text = s.name;
+                        sectionSelect.appendChild(opt);
+                    }
+                    // If URL had a numeric section parameter, set it
+                    const { section } = readUrlParams();
+                    if (section) {
+                        const optionByValue = sectionSelect.querySelector(`option[value="${section}"]`);
+                        if (optionByValue) {
+                            optionByValue.selected = true;
+                        } else {
+                            for (const opt of sectionSelect.options) {
+                                if (opt.text === section) { opt.selected = true; break; }
+                            }
+                        }
+                    }
+                } else {
+                    updateMsgAlert('Failed to load sections.', 'danger');
+                }
+            } catch (e) {
+                updateMsgAlert('Error loading sections.', 'danger');
+                console.error('Failed to load sections', e);
+            }
+        }
+    
+        // load sections on page load
+        await loadSections();
+    
+        // auto-fill code from URL if present
+        const { code } = readUrlParams();
+        if (code) codeInput.value = code;
+    
+        // Camera handlers
+        let stream;
+        document.getElementById('startCam').onclick = async () => {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                document.getElementById('snap').disabled = false;
+                updateMsgAlert('Camera started — click Capture when ready.', 'warning');
+            } catch (err) {
+                console.error(err);
+                updateMsgAlert('Unable to access camera: ' + (err.message || err), 'danger');
+            }
+        };
+    
+        document.getElementById('snap').onclick = () => {
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            document.getElementById('submit').disabled = false;
+            updateMsgAlert('Captured. Click Submit Attendance.', 'primary');
+        };
+    
+        document.getElementById('submit').onclick = async () => {
+            const reg = regInput.value.trim();
+            const codeVal = codeInput.value.trim();
+            const sectionId = sectionSelect.value; // numeric id
+            if (!reg || !codeVal || !sectionId) {
+                updateMsgAlert('Please enter registration number, session code and select a section.', 'danger');
+                return;
+            }
+            updateMsgAlert('<i class="fas fa-circle-notch fa-spin me-1"></i> Submitting...', 'info');
+    
+            const dataUrl = canvas.toDataURL('image/jpeg'); // base64
+    
+            const form = new FormData();
+            form.append('reg_no', reg);
+            form.append('code', codeVal);
+            form.append('section', sectionId);          // numeric id sent to backend
+            form.append('image_base64', dataUrl);
+    
+            try {
+                const res = await fetch('/api/submit_attendance', { method: 'POST', body: form });
+                const j = await res.json();
+                if (j.success) {
+                    updateMsgAlert('Attendance submitted <i class="fas fa-check-circle"></i>', 'success');
+                    document.getElementById('submit').disabled = true;
+                } else {
+                    updateMsgAlert('Error: ' + (j.msg || JSON.stringify(j)), 'danger');
+                }
+            } catch (err) {
+                console.error(err);
+                updateMsgAlert('Submission failed: ' + (err.message || err), 'danger');
+            }
+        };
+    
+    })();
+    </script>
+</body>
+</html>

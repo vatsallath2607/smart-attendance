@@ -132,6 +132,13 @@ def ensure_tables_exist():
     if 'session_num' not in att_cols:
         c.execute("ALTER TABLE attendance ADD COLUMN session_num INTEGER DEFAULT 1")
 
+    # Seed default sections if table is empty
+    c.execute("SELECT COUNT(*) FROM sections")
+    if c.fetchone()[0] == 0:
+        default_sections = ['Session 1', 'Session 2', 'Section 1', 'Section 2', 'SectionU1', 'SectionP2']
+        for s in default_sections:
+            c.execute("INSERT INTO sections(name) VALUES(?)", (s,))
+
     conn.commit()
     conn.close()
 
@@ -163,6 +170,18 @@ def load_known_encodings():
         logging.info("Loaded %d encodings from DB", len(known))
     except Exception as e:
         logging.warning("Failed to load encodings from DB: %s", e)
+
+    # If empty, auto-register from students.csv
+    if not known and os.path.exists('students.csv'):
+        try:
+            from register_students import register_from_csv
+            logging.info("Auto-registering students from students.csv on initial startup...")
+            register_from_csv('students.csv')
+            if os.path.exists(KNOWN_PICKLE):
+                with open(KNOWN_PICKLE, 'rb') as f:
+                    known = pickle.load(f)
+        except Exception as e:
+            logging.warning("Auto-registration from csv failed: %s", e)
     return known
 
 KNOWN = load_known_encodings()
@@ -187,6 +206,12 @@ def api_sections():
         conn = get_db()
         c = conn.cursor()
         rows = c.execute('SELECT id, name FROM sections ORDER BY id').fetchall()
+        if not rows:
+            default_sections = ['Session 1', 'Session 2', 'Section 1', 'Section 2', 'SectionU1', 'SectionP2']
+            for s in default_sections:
+                c.execute("INSERT INTO sections(name) VALUES(?)", (s,))
+            conn.commit()
+            rows = c.execute('SELECT id, name FROM sections ORDER BY id').fetchall()
         sections = [{'id': r['id'], 'name': r['name']} for r in rows]
         return jsonify({'success': True, 'sections': sections})
     except Exception as e:

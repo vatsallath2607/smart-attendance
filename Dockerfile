@@ -5,7 +5,7 @@ FROM python:3.10-slim
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 
-# Install runtime libraries needed by OpenCV
+# Install runtime libraries required by OpenCV
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
@@ -13,16 +13,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Upgrade pip and install precompiled dlib binary wheel
-# This completely prevents C++ compiling from source and prevents the 8GB RAM OOM error!
+# Upgrade pip
 RUN pip install --no-cache-dir --upgrade pip
-RUN pip install --no-cache-dir dlib-bin
 
-# Copy requirements and install remaining packages
+# Copy requirements (includes dlib-bin precompiled wheel, face_recognition_models, etc.)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy project files
+# Install face_recognition without dependencies so pip will NOT attempt to compile dlib from source
+RUN pip install --no-cache-dir --no-deps face_recognition
+
+# Copy all project files
 COPY . .
 
 # Ensure data and upload directories exist

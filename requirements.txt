@@ -1,6 +1,6 @@
 Flask>=2.0
 face_recognition
-opencv-python
+opencv-python-headless
 numpy
 qrcode
 Pillow

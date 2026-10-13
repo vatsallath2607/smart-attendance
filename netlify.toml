@@ -18,13 +18,13 @@
 # Replace https://your-smart-attendance-backend.onrender.com with your actual backend URL!
 [[redirects]]
   from = "/api/*"
-  to = "https://your-smart-attendance-backend.onrender.com/api/:splat"
+  to = "https://smart-attendance-2-e27y.onrender.com/api/:splat"
   status = 200
   force = true
 
 # Proxy photo uploads/assets served by backend
 [[redirects]]
   from = "/data/photos/*"
-  to = "https://your-smart-attendance-backend.onrender.com/data/photos/:splat"
+  to = "https://smart-attendance-2-e27y.onrender.com/data/photos/:splat"
   status = 200
   force = true

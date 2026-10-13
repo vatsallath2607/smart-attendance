@@ -1,4 +1,4 @@
 /                                /faculty.html                     200
 /student                         /student.html                     200
-/api/*                           https://your-smart-attendance-backend.onrender.com/api/:splat         200!
-/data/photos/*                   https://your-smart-attendance-backend.onrender.com/data/photos/:splat 200!
+/api/*                           https://smart-attendance-2-e27y.onrender.com/api/:splat         200!
+/data/photos/*                   https://smart-attendance-2-e27y.onrender.com/data/photos/:splat 200!

@@ -22,8 +22,13 @@
                     </div>
 
                     <div class="mb-3">
-                        <label for="code" class="form-label fw-bold">Session Code:</label>
-                        <input id="code" class="form-control" placeholder="Paste or scan code">
+                        <label for="session_code" class="form-label fw-bold"><i class="fas fa-key me-1 text-success"></i>Session Code:</label>
+                        <input id="session_code" class="form-control" placeholder="Enter session code (e.g. SES-XXXXXX)">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="range_code" class="form-label fw-bold"><i class="fas fa-location-crosshairs me-1 text-primary"></i>Range Code (10m):</label>
+                        <input id="range_code" class="form-control" placeholder="Enter 10m range code (e.g. RNG-XXXXXX)">
                     </div>
 
                     <div class="mb-3">
@@ -31,6 +36,16 @@
                         <select id="section_select" class="form-select">
                             <option value="">Loading sections…</option>
                         </select>
+                    </div>
+
+                    <div id="gps-status" class="alert alert-light border py-2 px-3 mb-3 d-flex align-items-center justify-content-between">
+                        <div class="small text-muted">
+                            <i class="fas fa-location-crosshairs text-primary me-1"></i>
+                            <span id="gps-text">GPS location verified on submission</span>
+                        </div>
+                        <button type="button" id="btn-detect-gps" class="btn btn-outline-primary btn-sm py-0 px-2" style="font-size:0.75rem;">
+                            Check GPS
+                        </button>
                     </div>
 
                     <div class="d-grid gap-2 d-md-block my-3 text-center">
@@ -62,16 +77,18 @@
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
         const sectionSelect = document.getElementById('section_select');
-        const codeInput = document.getElementById('code');
+        const sessionCodeInput = document.getElementById('session_code');
+        const rangeCodeInput = document.getElementById('range_code');
         const regInput = document.getElementById('reg_no');
         const msg = document.getElementById('msg');
     
-        // Helper: read ?code=...&section=... from URL and auto-fill
+        // Helper: read ?session_code=...&range_code=...&section=... from URL and auto-fill
         function readUrlParams() {
             const params = new URLSearchParams(window.location.search);
-            const code = params.get('code');
-            const section = params.get('section'); // note: this is numeric (our QR contains numeric section id)
-            return { code, section };
+            const session_code = params.get('session_code') || params.get('code');
+            const range_code = params.get('range_code');
+            const section = params.get('section');
+            return { session_code, range_code, section };
         }
         
         function updateMsgAlert(text, type) {
@@ -125,10 +142,33 @@
         // load sections on page load
         await loadSections();
     
-        // auto-fill code from URL if present
-        const { code } = readUrlParams();
-        if (code) codeInput.value = code;
+        // auto-fill codes from URL if present
+        const { session_code, range_code } = readUrlParams();
+        if (session_code) sessionCodeInput.value = session_code;
+        if (range_code) rangeCodeInput.value = range_code;
     
+        // GPS check button handler
+        const btnDetectGps = document.getElementById('btn-detect-gps');
+        const gpsText = document.getElementById('gps-text');
+        if (btnDetectGps) {
+            btnDetectGps.onclick = () => {
+                if (!navigator.geolocation) {
+                    gpsText.innerHTML = '<span class="text-danger"><i class="fas fa-times-circle"></i> Geolocation not supported</span>';
+                    return;
+                }
+                gpsText.innerHTML = '<i class="fas fa-spinner fa-spin text-primary"></i> Detecting location...';
+                navigator.geolocation.getCurrentPosition(
+                    pos => {
+                        gpsText.innerHTML = `<span class="text-success"><i class="fas fa-check-circle"></i> GPS Ready (±${Math.round(pos.coords.accuracy)}m)</span>`;
+                    },
+                    err => {
+                        gpsText.innerHTML = `<span class="text-danger"><i class="fas fa-exclamation-triangle"></i> Location Error: ${err.message}</span>`;
+                    },
+                    { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+                );
+            };
+        }
+
         // Camera handlers
         let stream;
         document.getElementById('startCam').onclick = async () => {
@@ -152,30 +192,103 @@
     
         document.getElementById('submit').onclick = async () => {
             const reg = regInput.value.trim();
-            const codeVal = codeInput.value.trim();
+            const sessionCodeVal = sessionCodeInput.value.trim();
+            const rangeCodeVal = rangeCodeInput.value.trim();
             const sectionId = sectionSelect.value; // numeric id
-            if (!reg || !codeVal || !sectionId) {
-                updateMsgAlert('Please enter registration number, session code and select a section.', 'danger');
+
+            if (!reg) {
+                updateMsgAlert('Please enter your Registration Number.', 'danger');
                 return;
             }
-            updateMsgAlert('<i class="fas fa-circle-notch fa-spin me-1"></i> Submitting...', 'info');
+            if (!sessionCodeVal) {
+                updateMsgAlert('Session Code is required! Please enter the Session Code.', 'danger');
+                return;
+            }
+            if (!rangeCodeVal) {
+                updateMsgAlert('Range Code is required! Please enter the Range Code.', 'danger');
+                return;
+            }
+            if (!sectionId) {
+                updateMsgAlert('Please select a section.', 'danger');
+                return;
+            }
+
+            updateMsgAlert('<i class="fas fa-satellite-dish fa-spin me-1"></i> Calibrating high-accuracy GPS & verifying location...', 'info');
+
+            // Attempt to get high-accuracy GPS coordinates with accuracy reading
+            let studentCoords = null;
+            if (navigator.geolocation) {
+                try {
+                    const pos = await new Promise((resolve, reject) => {
+                        let bestPos = null;
+                        let watchId = navigator.geolocation.watchPosition(
+                            p => {
+                                if (!bestPos || p.coords.accuracy < bestPos.coords.accuracy) {
+                                    bestPos = p;
+                                }
+                                if (p.coords.accuracy <= 20) {
+                                    navigator.geolocation.clearWatch(watchId);
+                                    resolve(bestPos);
+                                }
+                            },
+                            err => {
+                                if (bestPos) {
+                                    navigator.geolocation.clearWatch(watchId);
+                                    resolve(bestPos);
+                                } else {
+                                    navigator.geolocation.clearWatch(watchId);
+                                    reject(err);
+                                }
+                            },
+                            { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
+                        );
+                        // Timeout fallback to current best
+                        setTimeout(() => {
+                            navigator.geolocation.clearWatch(watchId);
+                            if (bestPos) resolve(bestPos);
+                            else navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 4000, maximumAge: 0 });
+                        }, 5000);
+                    });
+                    studentCoords = {
+                        latitude: pos.coords.latitude,
+                        longitude: pos.coords.longitude,
+                        accuracy: pos.coords.accuracy
+                    };
+                    if (gpsText) {
+                        gpsText.innerHTML = `<span class="text-success"><i class="fas fa-check-circle"></i> GPS Calibrated (±${Math.round(pos.coords.accuracy)}m)</span>`;
+                    }
+                } catch (geoErr) {
+                    console.warn('Geolocation acquisition failed or denied:', geoErr);
+                    if (gpsText) {
+                        gpsText.innerHTML = `<span class="text-warning"><i class="fas fa-exclamation-triangle"></i> GPS not acquired: ${geoErr.message}</span>`;
+                    }
+                }
+            }
     
             const dataUrl = canvas.toDataURL('image/jpeg'); // base64
     
             const form = new FormData();
             form.append('reg_no', reg);
-            form.append('code', codeVal);
-            form.append('section', sectionId);          // numeric id sent to backend
+            form.append('session_code', sessionCodeVal);
+            form.append('code', sessionCodeVal); // also send as code for backwards compatibility
+            form.append('range_code', rangeCodeVal);
+            form.append('section', sectionId);
             form.append('image_base64', dataUrl);
+
+            if (studentCoords) {
+                form.append('latitude', studentCoords.latitude);
+                form.append('longitude', studentCoords.longitude);
+                if (studentCoords.accuracy) form.append('accuracy', studentCoords.accuracy);
+            }
     
             try {
                 const res = await fetch('/api/submit_attendance', { method: 'POST', body: form });
                 const j = await res.json();
                 if (j.success) {
-                    updateMsgAlert('Attendance submitted <i class="fas fa-check-circle"></i>', 'success');
+                    updateMsgAlert(`<i class="fas fa-check-circle me-1"></i> ${j.msg || 'Attendance recorded successfully!'}`, 'success');
                     document.getElementById('submit').disabled = true;
                 } else {
-                    updateMsgAlert('Error: ' + (j.msg || JSON.stringify(j)), 'danger');
+                    updateMsgAlert(`<i class="fas fa-times-circle me-1"></i> ${j.msg || 'Failed to submit attendance.'}`, 'danger');
                 }
             } catch (err) {
                 console.error(err);

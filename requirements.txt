@@ -5,3 +5,4 @@ numpy
 qrcode
 Pillow
 pandas
+gunicorn

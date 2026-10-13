@@ -21,8 +21,21 @@
             <div class="controls-card card p-4 mb-4">
                 <div class="d-flex flex-wrap align-items-center gap-3 mb-4">
                     <div class="col-auto">
+                        <label for="faculty_name" class="form-label mb-0 fw-bold"><i class="fas fa-user-tie me-1"></i>Faculty Name:</label>
+                        <input id="faculty_name" type="text" class="form-control form-control-sm" placeholder="Enter Faculty Name" value="Prof. Faculty" style="min-width: 170px;">
+                    </div>
+
+                    <div class="col-auto">
                         <label for="section_select" class="form-label mb-0 fw-bold">Section:</label>
                         <select id="section_select" class="form-select form-select-sm"><option>Loading...</option></select>
+                    </div>
+
+                    <div class="col-auto">
+                        <label for="session_num_select" class="form-label mb-0 fw-bold"><i class="fas fa-layer-group me-1"></i>Session:</label>
+                        <select id="session_num_select" class="form-select form-select-sm" style="width: 120px;">
+                            <option value="1">Session 1</option>
+                            <option value="2">Session 2</option>
+                        </select>
                     </div>
 
                     <div class="col-auto">
@@ -30,7 +43,18 @@
                         <input id="duration" type="number" value="5" class="form-control form-control-sm" style="width: 80px;">
                     </div>
 
+                    <div class="col-auto">
+                        <label for="range_meters" class="form-label mb-0 fw-bold"><i class="fas fa-ruler-horizontal me-1"></i>Range:</label>
+                        <select id="range_meters" class="form-select form-select-sm" style="width: 100px;">
+                            <option value="10">10m</option>
+                            <option value="25">25m</option>
+                            <option value="50" selected>50m</option>
+                            <option value="100">100m</option>
+                        </select>
+                    </div>
+
                     <button id="start_att" class="btn btn-success btn-sm"><i class="fas fa-play me-1"></i>Start Attendance</button>
+                    <button id="submit_att" class="btn btn-primary btn-sm"><i class="fas fa-clipboard-check me-1"></i>Submit Attendance</button>
                     <button id="stop_att" class="btn btn-danger btn-sm" disabled><i class="fas fa-stop me-1"></i>Stop Attendance</button>
                     <button id="refresh" class="btn btn-outline-secondary btn-sm"><i class="fas fa-sync-alt me-1"></i>Refresh</button>
                     <button id="export" class="btn btn-info btn-sm text-white"><i class="fas fa-download me-1"></i>Export CSV</button>
@@ -38,20 +62,38 @@
                     <div id="status" class="ms-auto" style="min-width: 150px;"></div>
                 </div>
 
+                <!-- Dual Code Display Area -->
                 <div id="session_area" class="d-flex align-items-center flex-wrap gap-4 pt-3 border-top">
-                    <div id="code_display">
-                        <label class="form-label mb-1 fw-bold">Current Code:</label>
-                        <div id="code_box" class="code-box">---</div>
+                    <div>
+                        <label class="form-label mb-1 fw-bold text-success"><i class="fas fa-key me-1"></i>Session Code:</label>
+                        <div id="session_code_box" class="code-box">---</div>
+                    </div>
+                    <div>
+                        <label id="range_code_label" class="form-label mb-1 fw-bold text-primary"><i class="fas fa-location-crosshairs me-1"></i>Range Code:</label>
+                        <div id="range_code_box" class="code-box" style="border-color: #00bcd4 !important; background: #e0f7fa !important; color: #00838f !important;">---</div>
                     </div>
                     <div id="session_info">
+                        <div class="session-info"><b>Faculty:</b> <span id="faculty_name_display" class="fw-bold">--</span></div>
+                        <div class="session-info"><b>Session:</b> <span id="session_id_display" class="fw-bold text-primary">--</span></div>
+                        <div class="session-info"><b>Geofence:</b> <span id="geofence_badge" class="badge bg-primary"><i class="fas fa-shield-halved me-1"></i>Range Active</span></div>
+                        <div class="session-info" id="location_info_display" style="display:none;"><b>Faculty GPS:</b> <span id="coords_display">--</span></div>
                         <div class="session-info"><b>Expires at (UTC):</b> <span id="expires_at_display">--</span></div>
-                        <div class="session-info">Section ID: <span id="section_id_display">--</span></div>
                     </div>
                 </div>
             </div>
 
             <div class="card p-4">
-                <h5 class="card-title text-secondary mb-3"><i class="fas fa-list-ul me-2"></i>Attendance Records (Last 24 Hours)</h5>
+                <div class="d-flex flex-wrap align-items-center justify-content-between mb-3">
+                    <h5 class="card-title text-secondary mb-0"><i class="fas fa-list-ul me-2"></i>Attendance Records (Last 24 Hours)</h5>
+                    <div class="d-flex align-items-center gap-2 mt-2 mt-md-0">
+                        <label for="filter_session_num" class="form-label mb-0 fw-bold small text-muted"><i class="fas fa-filter me-1"></i>View Session:</label>
+                        <select id="filter_session_num" class="form-select form-select-sm" style="width: 150px;">
+                            <option value="">All Sessions</option>
+                            <option value="1">Session 1</option>
+                            <option value="2">Session 2</option>
+                        </select>
+                    </div>
+                </div>
                 <div id="table_wrap" class="table-responsive">
                     <p>Select a section and start a session to view attendance.</p>
                 </div>
@@ -62,7 +104,10 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
     (async function() {
+        const facultyNameInput = document.getElementById('faculty_name');
         const sectionSelect = document.getElementById('section_select');
+        const sessionNumSelect = document.getElementById('session_num_select');
+        const filterSessionNum = document.getElementById('filter_session_num');
         const status = document.getElementById('status');
         const tableWrap = document.getElementById('table_wrap');
         const startBtn = document.getElementById('start_att');
@@ -70,9 +115,17 @@
         const refreshBtn = document.getElementById('refresh');
         const exportBtn = document.getElementById('export');
         const durationInput = document.getElementById('duration');
-        const codeBox = document.getElementById('code_box');
+        const rangeMetersSelect = document.getElementById('range_meters');
+        const sessionCodeBox = document.getElementById('session_code_box');
+        const rangeCodeBox = document.getElementById('range_code_box');
+        const geofenceBadge = document.getElementById('geofence_badge');
+        const rangeCodeLabel = document.getElementById('range_code_label');
         const expiresAtDisplay = document.getElementById('expires_at_display');
-        const sectionIdDisplay = document.getElementById('section_id_display');
+        const sessionIdDisplay = document.getElementById('session_id_display');
+        const facultyNameDisplay = document.getElementById('faculty_name_display');
+        const locationInfoDisplay = document.getElementById('location_info_display');
+        const coordsDisplay = document.getElementById('coords_display');
+        const submitBtn = document.getElementById('submit_att');
         
         let currentSession = null; 
     
@@ -105,14 +158,71 @@
         async function startAttendance() {
             const section = sectionSelect.value;
             if (!section) return alert('Select a section first');
+            const facultyName = facultyNameInput.value.trim() || 'Faculty';
             let duration = parseInt(durationInput.value) || 5;
             startBtn.disabled = true;
-            status.innerHTML = '<span class="text-secondary"><i class="fas fa-circle-notch fa-spin me-1"></i>Starting...</span>';
+            
+            let selectedRange = parseFloat(rangeMetersSelect.value) || 10.0;
+            let selectedSessionNum = parseInt(sessionNumSelect.value) || 1;
+            let payload = { 
+                section_id: section, 
+                session_num: selectedSessionNum,
+                duration_min: duration, 
+                faculty_name: facultyName,
+                is_range: true,
+                range_meters: selectedRange
+            };
+
+            // Acquire faculty GPS coordinates with high accuracy
+            if (navigator.geolocation) {
+                status.innerHTML = '<span class="text-secondary"><i class="fas fa-satellite-dish fa-spin me-1"></i>Calibrating GPS location...</span>';
+                try {
+                    // Try to get fresh, high-accuracy position
+                    const pos = await new Promise((resolve, reject) => {
+                        let bestPos = null;
+                        let watchId = navigator.geolocation.watchPosition(
+                            p => {
+                                if (!bestPos || p.coords.accuracy < bestPos.coords.accuracy) {
+                                    bestPos = p;
+                                }
+                                if (p.coords.accuracy <= 20) {
+                                    navigator.geolocation.clearWatch(watchId);
+                                    resolve(bestPos);
+                                }
+                            },
+                            err => {
+                                if (bestPos) {
+                                    navigator.geolocation.clearWatch(watchId);
+                                    resolve(bestPos);
+                                } else {
+                                    navigator.geolocation.clearWatch(watchId);
+                                    reject(err);
+                                }
+                            },
+                            { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
+                        );
+                        // Timeout fallback to current best
+                        setTimeout(() => {
+                            navigator.geolocation.clearWatch(watchId);
+                            if (bestPos) resolve(bestPos);
+                            else navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 4000, maximumAge: 0 });
+                        }, 5000);
+                    });
+                    payload.latitude = pos.coords.latitude;
+                    payload.longitude = pos.coords.longitude;
+                    payload.accuracy = pos.coords.accuracy;
+                } catch (geoErr) {
+                    console.warn('Faculty Geolocation error:', geoErr);
+                    alert('Note: Location access error (' + geoErr.message + '). Please ensure location permission is allowed for accuracy.');
+                }
+            }
+
+            status.innerHTML = '<span class="text-secondary"><i class="fas fa-circle-notch fa-spin me-1"></i>Starting session & generating codes...</span>';
             try {
                 const res = await fetch('/api/generate_session', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({section_id: section, duration_min: duration})
+                    body: JSON.stringify(payload)
                 });
                 const j = await res.json();
                 if (!j.success) {
@@ -122,13 +232,21 @@
                 }
                 currentSession = {
                     session_id: j.session_id,
-                    code: j.code,
+                    session_num: j.session_num || selectedSessionNum,
+                    session_code: j.session_code || j.code,
+                    range_code: j.range_code,
+                    faculty_name: j.faculty_name,
                     expires_at: j.expires_at,
-                    section_id: section
+                    section_id: section,
+                    is_range: j.is_range,
+                    range_meters: j.range_meters || selectedRange,
+                    latitude: j.latitude,
+                    longitude: j.longitude,
+                    accuracy: payload.accuracy
                 };
                 showSession(currentSession);
                 stopBtn.disabled = false;
-                status.innerHTML = `<span class="success"><i class="fas fa-check-circle me-1"></i>Session started</span>`;
+                status.innerHTML = `<span class="success"><i class="fas fa-check-circle me-1"></i>Session active (Session ${currentSession.session_num}, ${currentSession.range_meters}m)</span>`;
                 await loadAttendance();
                 startBtn.disabled = false;
             } catch (e) {
@@ -178,24 +296,89 @@
     
         function showSession(s) {
             if (!s) {
-                codeBox.innerHTML = '---';
-                expiresAtDisplay.innerText = '--';
-                sectionIdDisplay.innerText = '--';
-                stopBtn.disabled = true;
+                if (sessionCodeBox) sessionCodeBox.innerHTML = '---';
+                if (rangeCodeBox) rangeCodeBox.innerHTML = '---';
+                if (rangeCodeLabel) rangeCodeLabel.innerHTML = '<i class="fas fa-location-crosshairs me-1"></i>Range Code:';
+                if (geofenceBadge) geofenceBadge.innerHTML = '<i class="fas fa-shield-halved me-1"></i>Range Active';
+                if (facultyNameDisplay) facultyNameDisplay.innerText = '--';
+                if (expiresAtDisplay) expiresAtDisplay.innerText = '--';
+                if (sessionIdDisplay) sessionIdDisplay.innerText = '--';
+                if (locationInfoDisplay) locationInfoDisplay.style.display = 'none';
+                if (stopBtn) stopBtn.disabled = true;
                 return;
             }
-            codeBox.innerHTML = s.code;
-            expiresAtDisplay.innerText = formatTimestamp(s.expires_at);
-            sectionIdDisplay.innerText = s.section_id;
-            stopBtn.disabled = false;
+            if (sessionCodeBox) sessionCodeBox.innerHTML = s.session_code || s.code || '---';
+            if (rangeCodeBox) rangeCodeBox.innerHTML = s.range_code || '---';
+            const rangeM = Math.round(s.range_meters || 10);
+            if (rangeCodeLabel) rangeCodeLabel.innerHTML = `<i class="fas fa-location-crosshairs me-1"></i>Range Code (${rangeM}m):`;
+            if (geofenceBadge) geofenceBadge.innerHTML = `<i class="fas fa-shield-halved me-1"></i>${rangeM}m Range Active`;
+            if (facultyNameDisplay) facultyNameDisplay.innerText = s.faculty_name || 'Faculty';
+            if (expiresAtDisplay) expiresAtDisplay.innerText = formatTimestamp(s.expires_at);
+            // Display Session 1 or Session 2 as selected
+            const sessText = s.session_num ? `Session ${s.session_num}` : (sessionNumSelect ? `Session ${sessionNumSelect.value}` : 'Session 1');
+            if (sessionIdDisplay) sessionIdDisplay.innerText = sessText;
+
+            if (s.latitude && s.longitude) {
+                if (locationInfoDisplay) locationInfoDisplay.style.display = 'block';
+                const accStr = s.accuracy ? ` (±${Math.round(s.accuracy)}m)` : '';
+                if (coordsDisplay) coordsDisplay.innerText = `${Number(s.latitude).toFixed(5)}, ${Number(s.longitude).toFixed(5)}${accStr}`;
+            } else {
+                if (locationInfoDisplay) locationInfoDisplay.style.display = 'none';
+            }
+            if (stopBtn) stopBtn.disabled = false;
         }
+
+        // Faculty attendance submit handler (no registration number needed)
+        submitBtn.onclick = async () => {
+            const sid = sectionSelect.value;
+            const fname = facultyNameInput.value.trim() || 'Faculty';
+
+            if (!sid) return alert('Please select a Section');
+
+            submitBtn.disabled = true;
+            status.innerHTML = '<span class="text-secondary"><i class="fas fa-circle-notch fa-spin me-1"></i>Submitting attendance...</span>';
+
+            try {
+                const sessionFaculty = (currentSession && currentSession.faculty_name) ? currentSession.faculty_name : fname;
+                const payload = {
+                    section_id: sid,
+                    session_id: currentSession ? currentSession.session_id : null,
+                    faculty_name: sessionFaculty
+                };
+                const res = await fetch('/api/faculty_submit_attendance', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                const j = await res.json();
+                if (j.success) {
+                    status.innerHTML = `<span class="success fw-bold"><i class="fas fa-check-double me-1"></i>${j.msg}</span>`;
+                    // If active session was submitted, update session view and stop button
+                    if (currentSession) {
+                        currentSession = null;
+                        showSession(null);
+                    }
+                    await loadAttendance();
+                } else {
+                    status.innerHTML = `<span class="error fw-bold"><i class="fas fa-times-circle me-1"></i>${j.msg}</span>`;
+                }
+            } catch (err) {
+                status.innerHTML = `<span class="error fw-bold"><i class="fas fa-times-circle me-1"></i>Failed: ${err.message || err}</span>`;
+            } finally {
+                submitBtn.disabled = false;
+            }
+        };
     
         async function loadAttendance() {
             const sid = sectionSelect.value;
             if (!sid) { tableWrap.innerHTML = '<p class="alert alert-warning">Select a section to view attendance.</p>'; return; }
+            const sessionFilterVal = filterSessionNum ? filterSessionNum.value : '';
             status.innerHTML = '<span class="text-secondary"><i class="fas fa-circle-notch fa-spin me-1"></i>Loading...</span>';
             try {
-                const res = await fetch(`/api/attendance/${sid}`);
+                const url = sessionFilterVal 
+                    ? `/api/attendance/${sid}?session_num=${encodeURIComponent(sessionFilterVal)}`
+                    : `/api/attendance/${sid}`;
+                const res = await fetch(url);
                 const j = await res.json();
                 if (!j.success) {
                     tableWrap.innerHTML = `<p class="alert alert-danger">Error: ${j.msg || 'failed'}</p>`;
@@ -209,12 +392,42 @@
                     return;
                 }
                 
-                let html = '<table class="table table-striped table-hover align-middle"><thead><tr><th scope="col">Reg No</th><th scope="col">Photo</th><th scope="col">Timestamp</th></tr></thead><tbody>';
+                let html = '<table class="table table-striped table-hover align-middle"><thead><tr><th scope="col">Reg No</th><th scope="col">Session</th><th scope="col">Photo</th><th scope="col">Range Distance</th><th scope="col">Status</th><th scope="col">Faculty</th><th scope="col">Timestamp</th></tr></thead><tbody>';
                 rows.forEach(r => {
-                    const photoUrl = r.photo_path.startsWith('/') ? r.photo_path : '/' + r.photo_path;
+                    const isManual = r.photo_path === 'manual_by_faculty';
+                    const normalizedPhoto = r.photo_path ? r.photo_path.replace(/\\/g, '/') : '';
+                    const photoSrc = normalizedPhoto.startsWith('/') ? normalizedPhoto : '/' + normalizedPhoto;
+                    const photoHtml = isManual 
+                        ? '<span class="badge bg-secondary"><i class="fas fa-user-pen me-1"></i>Faculty Direct</span>'
+                        : `<a href="${photoSrc}" target="_blank"><img class="thumb" src="${photoSrc}" alt="Student Photo"></a>`;
+                    
+                    let distHtml = '<span class="text-muted">-</span>';
+                    if (r.distance !== null && r.distance !== undefined) {
+                        const distNum = parseFloat(r.distance);
+                        if (distNum <= 10.0) {
+                            distHtml = `<span class="badge bg-success"><i class="fas fa-check-circle me-1"></i>${distNum.toFixed(1)}m</span>`;
+                        } else {
+                            distHtml = `<span class="badge bg-danger"><i class="fas fa-times-circle me-1"></i>${distNum.toFixed(1)}m</span>`;
+                        }
+                    }
+
+                    let statusBadge = '';
+                    if (r.status === 'ATTENDANCE RECORDED' || r.status === 'ATTENDANCE SUBMITTED' || r.status === 'MARKED') {
+                        statusBadge = '<span class="badge bg-success"><i class="fas fa-check-double me-1"></i>Attendance Recorded</span>';
+                    } else {
+                        statusBadge = '<span class="badge bg-warning text-dark"><i class="fas fa-clock me-1"></i>Pending</span>';
+                    }
+
+                    const markedBy = r.faculty_name ? `<span class="badge bg-info text-dark">${r.faculty_name}</span>` : '<span class="text-muted">Faculty</span>';
+                    const sessBadge = `<span class="badge bg-secondary">Session ${r.session_num || 1}</span>`;
+
                     html += `<tr>
-                                <td>${r.reg_no}</td>
-                                <td><a href="${photoUrl}" target="_blank"><img class="thumb" src="${photoUrl}" alt="Student Photo"></a></td>
+                                <td><b>${r.reg_no}</b></td>
+                                <td>${sessBadge}</td>
+                                <td>${photoHtml}</td>
+                                <td>${distHtml}</td>
+                                <td>${statusBadge}</td>
+                                <td>${markedBy}</td>
                                 <td>${formatTimestamp(r.timestamp)}</td>
                             </tr>`;
                 });
@@ -233,32 +446,86 @@
             if (!sid) return alert('Select a section first');
             const rows = Array.from(document.querySelectorAll('#table_wrap table tbody tr'));
             if (rows.length === 0) return alert('No rows to export');
-            let csv = 'reg_no,photo_url,timestamp\n';
+            let csv = 'reg_no,session,photo_url,range_distance,status,faculty,timestamp\n';
             rows.forEach(tr => {
                 const cols = tr.querySelectorAll('td');
                 const reg = cols[0].innerText.trim();
-                const photo = cols[1].querySelector('a').href;
-                const ts = cols[2].innerText.trim();
-                csv += `"${reg.replace(/"/g, '""')}","${photo.replace(/"/g, '""')}","${ts.replace(/"/g, '""')}"\n`;
+                const sessionNum = cols[1].innerText.trim();
+                const photoLink = cols[2].querySelector('a');
+                const photo = photoLink ? photoLink.href : 'photo_recorded';
+                const dist = cols[3].innerText.trim();
+                const stat = cols[4].innerText.trim();
+                const faculty = cols[5].innerText.trim();
+                const ts = cols[6].innerText.trim();
+                csv += `"${reg.replace(/"/g, '""')}","${sessionNum.replace(/"/g, '""')}","${photo.replace(/"/g, '""')}","${dist.replace(/"/g, '""')}","${stat.replace(/"/g, '""')}","${faculty.replace(/"/g, '""')}","${ts.replace(/"/g, '""')}"\n`;
             });
             const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url; a.download = `attendance_section_${sid}_${new Date().toISOString().slice(0, 10)}.csv`;
+            const filterSuffix = filterSessionNum && filterSessionNum.value ? `_session${filterSessionNum.value}` : '_all_sessions';
+            a.href = url; a.download = `attendance_section_${sid}${filterSuffix}_${new Date().toISOString().slice(0, 10)}.csv`;
             document.body.appendChild(a); a.click(); a.remove();
             URL.revokeObjectURL(url);
         }
     
+        async function checkActiveSession() {
+            const sid = sectionSelect.value;
+            if (!sid) return;
+            try {
+                const res = await fetch(`/api/current_session/${sid}`);
+                const j = await res.json();
+                if (j.success) {
+                    currentSession = {
+                        session_id: j.session_id,
+                        session_num: j.session_num || 1,
+                        session_code: j.session_code || j.code,
+                        range_code: j.range_code,
+                        faculty_name: j.faculty_name,
+                        expires_at: j.expires_at,
+                        section_id: sid,
+                        is_range: true,
+                        range_meters: j.range_meters,
+                        latitude: j.latitude,
+                        longitude: j.longitude
+                    };
+                    if (sessionNumSelect && j.session_num) {
+                        sessionNumSelect.value = String(j.session_num);
+                    }
+                    showSession(currentSession);
+                    stopBtn.disabled = false;
+                } else {
+                    currentSession = null;
+                    showSession(null);
+                }
+            } catch (e) {
+                console.warn('Could not check active session:', e);
+            }
+        }
+
         // events
         startBtn.onclick = startAttendance;
         stopBtn.onclick = stopAttendance;
         refreshBtn.onclick = loadAttendance;
         exportBtn.onclick = exportCSV;
-        sectionSelect.onchange = loadAttendance;
+        filterSessionNum.onchange = loadAttendance;
+        sectionSelect.onchange = async () => {
+            await checkActiveSession();
+            await loadAttendance();
+        };
     
         // initial load
         await loadSections();
-        if (sectionSelect.value) loadAttendance();
+        if (sectionSelect.value) {
+            await checkActiveSession();
+            await loadAttendance();
+        }
+
+        // Auto-refresh attendance records every 5 seconds so updates appear automatically
+        setInterval(async () => {
+            if (sectionSelect.value) {
+                await loadAttendance();
+            }
+        }, 5000);
     
     })();
     </script>

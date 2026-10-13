@@ -1,0 +1,30 @@
+# Netlify Configuration for Smart Attendance System
+[build]
+  publish = "static"
+
+# Route root to faculty dashboard
+[[redirects]]
+  from = "/"
+  to = "/faculty.html"
+  status = 200
+
+# Route /student to student portal
+[[redirects]]
+  from = "/student"
+  to = "/student.html"
+  status = 200
+
+# Proxy API calls to your hosted Flask backend (e.g. Render, Railway, or VPS)
+# Replace https://your-smart-attendance-backend.onrender.com with your actual backend URL!
+[[redirects]]
+  from = "/api/*"
+  to = "https://your-smart-attendance-backend.onrender.com/api/:splat"
+  status = 200
+  force = true
+
+# Proxy photo uploads/assets served by backend
+[[redirects]]
+  from = "/data/photos/*"
+  to = "https://your-smart-attendance-backend.onrender.com/data/photos/:splat"
+  status = 200
+  force = true

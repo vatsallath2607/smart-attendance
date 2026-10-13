@@ -150,3 +150,15 @@ img.thumb:hover {
     background-color: #ffebee;
     border-color: #ffcdd2;
 }
+
+#gps-status {
+    border-radius: 8px;
+    background-color: #f8fafc;
+    border: 1px dashed #90caf9 !important;
+}
+
+.range-code-box {
+    border-color: #00bcd4 !important;
+    background: #e0f7fa !important;
+    color: #00838f !important;
+}

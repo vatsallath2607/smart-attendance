@@ -132,12 +132,12 @@ def ensure_tables_exist():
     if 'session_num' not in att_cols:
         c.execute("ALTER TABLE attendance ADD COLUMN session_num INTEGER DEFAULT 1")
 
-    # Seed default sections if table is empty
-    c.execute("SELECT COUNT(*) FROM sections")
+    # Ensure ONLY SectionU1 and SectionP2 exist
+    c.execute("DELETE FROM sections WHERE name NOT IN ('SectionU1', 'SectionP2')")
+    c.execute("SELECT COUNT(*) FROM sections WHERE name IN ('SectionU1', 'SectionP2')")
     if c.fetchone()[0] == 0:
-        default_sections = ['Session 1', 'Session 2', 'Section 1', 'Section 2', 'SectionU1', 'SectionP2']
-        for s in default_sections:
-            c.execute("INSERT INTO sections(name) VALUES(?)", (s,))
+        c.execute("INSERT INTO sections(name) VALUES('SectionU1')")
+        c.execute("INSERT INTO sections(name) VALUES('SectionP2')")
 
     conn.commit()
     conn.close()
@@ -205,13 +205,14 @@ def api_sections():
     try:
         conn = get_db()
         c = conn.cursor()
-        rows = c.execute('SELECT id, name FROM sections ORDER BY id').fetchall()
+        c.execute("DELETE FROM sections WHERE name NOT IN ('SectionU1', 'SectionP2')")
+        conn.commit()
+        rows = c.execute("SELECT id, name FROM sections WHERE name IN ('SectionU1', 'SectionP2') ORDER BY id").fetchall()
         if not rows:
-            default_sections = ['Session 1', 'Session 2', 'Section 1', 'Section 2', 'SectionU1', 'SectionP2']
-            for s in default_sections:
-                c.execute("INSERT INTO sections(name) VALUES(?)", (s,))
+            c.execute("INSERT INTO sections(name) VALUES('SectionU1')")
+            c.execute("INSERT INTO sections(name) VALUES('SectionP2')")
             conn.commit()
-            rows = c.execute('SELECT id, name FROM sections ORDER BY id').fetchall()
+            rows = c.execute("SELECT id, name FROM sections WHERE name IN ('SectionU1', 'SectionP2') ORDER BY id").fetchall()
         sections = [{'id': r['id'], 'name': r['name']} for r in rows]
         return jsonify({'success': True, 'sections': sections})
     except Exception as e:
